@@ -10,22 +10,33 @@
 import threading
 import socket
 import time, datetime
-import struct
-import random
+import syslog
 
 import forecastio
 from evdev import InputDevice, categorize, ecodes
 
 import wb_config as config
 
-location = None
 wCurrently = None
 wTomorrow = None
+demoIndex = 0
+cueList = ( "CLEAR_DAY",
+			"CLEAR_NIGHT",
+			"RAIN",
+			"SNOW",
+			"SLEET",
+			"WIND",
+			"FOG",
+			"CLOUDY",
+			"PARTLY_CLOUDY_DAY",
+			"PARTLY_CLOUDY_NIGHT")
 
-mouseInput = open( "/dev/input/mice", "rb" );
+
+
+# mouseInput = open( "/dev/input/mice", "rb" );
 
 def weatherUpdate():
-	print 'Updating weather...'
+	log('Updating weather...')
 	forecast = forecastio.load_forecast(config.weather_api_key, config.location[0], config.location[1])
 
 	global wCurrently, wTomorrow
@@ -38,44 +49,35 @@ def weatherUpdate():
 	if wTomorrow is not forecast.daily().data[0].icon:
 		wTomorrow = forecast.daily().data[0].icon
 
-	print "Currently: " + wCurrently
-	print "Tomorrow: " + wTomorrow
+	log("Currently: " + wCurrently)
+	log("Tomorrow: " + wTomorrow)
 
-	
 	#setWeatherTimer()
 
-# returns location; at some point this should be auto lat/long from API
-def getLocation():
-	return config.location
 
+# start timer for next cheack of weather
 def setWeatherTimer():
+	log("Setting timer for next weather update")
 	weatherTimer = threading.Timer(600.0, weatherUpdate).start()
 
+# sends a cue to the weatherbox Processing app to change to a different view
 def sendCue(cue):
-	print "cue"
+	# set up socket
 	x = 0
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+	# try up to 3 times to connect
 	while x < 3:
 		try:
+			log("Connecting to weatherbox server")
 			s.connect((config.cue_server_ip, config.cue_server_port))
 			s.sendall(cue)
 		except:
-			print "Can't connect to weatherbox server"
+			log("Can't connect to weatherbox server")
 			x += 1
 			time.sleep(15)
 
 	s.close()
-
-
-# def sendRandomCue():
-# 	c = random.randint(1,3)
-# 	if c is 1:
-# 		sendCue('rain')
-# 	elif c is 2:
-# 		sendCue('snow')
-# 	else:
-# 		sendCue('clear-day')
 
 # def getMouseEvent():
 #   buf = mouseInput.read(3);
@@ -97,12 +99,26 @@ def touchLoop():
 	while True:
 		for event in dev.read_loop():
 			if event.type == ecodes.BTN:
-				print(categorize(event))	
+				log(categorize(event))
+				demoCycle();
+
+# convenience function to allow cycling through all possible cues
+def demoCycle():
+	global demoIndex
+
+	if demoIndex < len(cueList):
+		sendCue(cueList[demoIndex])
+		demoIndex++
+	else:
+		demoIndex = 0
+		sendCue(cueList[demoIndex])		
+
+
+# convenience function to route logs to a destination
+def log(msg):
+	syslog.syslog("WB-CUE: " + msg)
 
 def startCueClient():
-	# get location
-	global location
-	location = getLocation()
 
 	# init loop to check weather
 	weatherUpdate();
