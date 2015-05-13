@@ -11,6 +11,7 @@ import threading
 import socket
 import time, datetime
 import syslog
+import sys
 
 import forecastio
 from evdev import InputDevice, categorize, ecodes
@@ -24,7 +25,6 @@ cueList = ( "CLEAR_DAY",
 			"CLEAR_NIGHT",
 			"RAIN",
 			"SNOW",
-			"SLEET",
 			"WIND",
 			"FOG",
 			"CLOUDY",
@@ -64,20 +64,23 @@ def setWeatherTimer():
 def sendCue(cue):
 	# set up socket
 	x = 0
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 	# try up to 3 times to connect
 	while x < 3:
+		x += 1
 		try:
 			log("Connecting to weatherbox server")
+			s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			s.connect((config.cue_server_ip, config.cue_server_port))
 			s.sendall(cue)
+			x = 3
+			log("Sent cue: " + cue)
 		except:
-			log("Can't connect to weatherbox server")
-			x += 1
+			log("Socket connection error")
 			time.sleep(15)
+		finally:
+			s.close()
 
-	s.close()
 
 # def getMouseEvent():
 #   buf = mouseInput.read(3);
@@ -108,7 +111,7 @@ def demoCycle():
 
 	if demoIndex < len(cueList):
 		sendCue(cueList[demoIndex])
-		demoIndex++
+		demoIndex += 1
 	else:
 		demoIndex = 0
 		sendCue(cueList[demoIndex])		
@@ -120,8 +123,12 @@ def log(msg):
 
 def startCueClient():
 
+	while (True):
+		demoCycle()
+		time.sleep(10)
+
 	# init loop to check weather
-	weatherUpdate();
+#	weatherUpdate();
 
 	# init loop to take touchscreen input
 	# touchThread = threading.Thread(target=touchLoop)
