@@ -32,9 +32,6 @@ cueList = ( "CLEAR_DAY",
 			"PARTLY_CLOUDY_NIGHT")
 
 
-
-# mouseInput = open( "/dev/input/mice", "rb" );
-
 def weatherUpdate():
 	log('Updating weather...')
 	forecast = forecastio.load_forecast(config.weather_api_key, config.location[0], config.location[1])
@@ -52,7 +49,7 @@ def weatherUpdate():
 	log("Currently: " + wCurrently)
 	log("Tomorrow: " + wTomorrow)
 
-	#setWeatherTimer()
+	setWeatherTimer()
 
 
 # start timer for next cheack of weather
@@ -101,8 +98,8 @@ def touchLoop():
 	dev = InputDevice('/dev/input/event0')
 	while True:
 		for event in dev.read_loop():
-			if event.type == ecodes.BTN:
-				log(categorize(event))
+			# match BTN_LEFT DOWN
+			if event.type == ecodes.EV_KEY and event.value == 1:
 				demoCycle();
 
 # convenience function to allow cycling through all possible cues
@@ -123,16 +120,17 @@ def log(msg):
 
 def startCueClient():
 
-	while (True):
-		demoCycle()
-		time.sleep(10)
+	touchThread = threading.Thread(target=touchLoop)
+	touchThread.start()
+
+	# while (True):
+	# 	demoCycle()
+	# 	time.sleep(10)
 
 	# init loop to check weather
-#	weatherUpdate();
+	weatherUpdate();
 
 	# init loop to take touchscreen input
-	# touchThread = threading.Thread(target=touchLoop)
-	# touchThread.start()
 
 	# while(True):
 	# 	event = getMouseEvent()
